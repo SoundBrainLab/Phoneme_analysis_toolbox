@@ -22,6 +22,7 @@ class Corpus:
         self.load_from_cache = load_from_cache
         self.cache_dir = os.path.join(directory, 'cached')
         self.passages = self.__load_passages()
+        self.oovs = self.__find_oovs()
 
     def __load_passages(self):
         """
@@ -60,6 +61,38 @@ class Corpus:
 
         return passages
 
+    def __find_oovs(self):
+        """
+        Find out-of-vocabulary words in all passages.
+        """
+        all_oovs = [p.get_oovs() for p in self.passages]
+        all_oovs = list(set([oov for oovlist in all_oovs for oov in oovlist]))
+        return all_oovs
+
+    def get_oovs(self):
+        """
+        Return out-of-vocabulary words.
+
+        Returns:
+            list: List of OOV words.
+        """
+        return self.oovs[:]
+
+    def export_oovs(self, outpath = None):
+        """
+        Export the OOV word list to a txt file.
+
+        Args:
+            outpath (str, optional): Path to which the list will be saved. If None, save to the passage folder with the name oovs.txt. Default to None.
+        """
+        if len(self.oovs) > 0:
+            if outpath is None:
+                outpath = self.directory + '/oovs.txt'
+            with open(outpath, 'w') as f:
+                f.write('\n'.join(self.oovs[:]))
+        else:
+            print('No OOV words in the corpus.')
+        
 # Cache for phoneme lookups
 phoneme_cache = {}
 
@@ -86,6 +119,7 @@ class Passage:
         self.__check_counts()
 
         self.n_phonemes = sum(self.phoneme_count.values())
+        self.n_unique_phonemes = len(self.phoneme_count.keys())
         self.n_words = len(self.phon_trans)
 
     def __read_input_text(self, input_data):
@@ -109,6 +143,7 @@ class Passage:
         Clean the input text by converting to lowercase and removing punctuations except for apostrophes, newline characters, trailing spaces, and extra spaces.
         """
         self.text = self.text.lower().replace('\n', ' ')
+        self.text = self.text.replace('’', "'")
         self.text = re.sub(r"[^\w\s']", '', self.text)
         self.text = re.sub(r'\s+', ' ', self.text).strip()
 
@@ -186,15 +221,61 @@ class Passage:
         """
         self.name = new_name
 
-    def get_phoneme_count(self, by_position = False):
+    # Getter functions
+    def get_name(self):
         """
-        Returns the total phoneme count or count by position.
-
-        Args:
-            by_position (bool): Whether to return count by position or not
+        Returns name of the passage instance.
 
         Returns:
-            dict: Phoneme count
+            str: Name of passage.
+        """
+        return self.name
+
+    def get_oovs(self):
+        """
+        Returns out-of-vocabulary words.
+
+        Returns:
+            list: List of OOV words.
+        """
+        return self.oovs[:]
+
+    def get_n_phonemes(self):
+        """
+        Returns total phoneme instance count.
+
+        Returns:
+            int: Total phoneme instance count.
+        """
+        return self.n_phonemes
+
+    def get_n_unique_phonemes(self):
+        """
+        Returns no. unique phonemes.
+
+        Returns:
+            int: Unique phoneme count.
+        """
+        return self.n_unique_phonemes
+
+    def get_n_words(self):
+        """
+        Returns total word token count.
+
+        Returns:
+            int: Total word token count.
+        """
+        return self.n_words
+    
+    def get_phoneme_freqs(self, by_position = False):
+        """
+        Returns the total frequency/count for each phoneme or frequency by position.
+
+        Args:
+            by_position (bool): Whether to return frequency by position or not
+
+        Returns:
+            dict: Frequency for each phoneme 
         """
         if by_position:
             return copy.deepcopy(self.phoneme_count_by_pos)
